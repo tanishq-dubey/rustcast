@@ -7,7 +7,6 @@ use image::RgbaImage;
 use objc2_app_kit::NSWorkspace;
 use objc2_foundation::NSURL;
 
-/// This logs an error to the error log file
 pub fn icns_data_to_handle(data: Vec<u8>) -> Option<Handle> {
     let family = IconFamily::read(std::io::Cursor::new(&data)).ok()?;
 

@@ -16,19 +16,24 @@ use core::{
 };
 use std::{
     env,
+    io::Cursor,
     path::{Path, PathBuf},
     sync::LazyLock,
 };
 
+use iced::widget::image::Handle;
 use log::error;
+use objc2::{Message, rc::Retained};
+use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSImage, NSImageRep, NSWorkspace};
 use objc2_core_foundation::{CFArray, CFRetained, CFURL};
-use objc2_foundation::{NSBundle, NSNumber, NSString, NSURL, ns_string};
+use objc2_foundation::{
+    NSBundle, NSData, NSDictionary, NSNumber, NSSize, NSString, NSURL, ns_string,
+};
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
 
 use crate::{
     app::apps::{App, AppCommand},
     commands::Function,
-    utils::handle_from_icns,
 };
 
 use super::super::cross;
@@ -238,18 +243,17 @@ fn query_app(url: impl AsRef<NSURL>, store_icons: bool) -> Option<App> {
                 .map(|stem| stem.to_string_lossy().into_owned())
         })?;
 
-    let icons = store_icons
-        .then(|| {
-            get_string(ns_string!("CFBundleIconFile")).and_then(|icon| {
-                let mut path = path.join("Contents/Resources").join(&icon);
-                if path.extension().is_none() {
-                    path.set_extension("icns");
-                }
-
-                handle_from_icns(&path)
-            })
-        })
-        .flatten();
+    let icon = icon_of_path_ns(path.to_str().unwrap_or(&name)).unwrap_or(vec![]);
+    let icons = if store_icons {
+        image::ImageReader::new(Cursor::new(icon))
+            .with_guessed_format()
+            .unwrap()
+            .decode()
+            .ok()
+            .map(|img| Handle::from_rgba(img.width(), img.height(), img.into_bytes()))
+    } else {
+        None
+    };
 
     Some(App {
         ranking: 0,
@@ -306,4 +310,83 @@ fn is_helper_location(path: &Path) -> bool {
         || s.contains("/Contents/Helpers/")
         || s.contains("/Contents/Frameworks/")
         || s.contains("/Library/PrivilegedHelperTools/")
+}
+
+/// https://github.com/cardisoft/cardinal/blob/339b27c3c6abaf94405a9ab09ec39296baba4f91/fs-icon/src/lib.rs#L37
+pub fn icon_of_path_ns(path: &str) -> Option<Vec<u8>> {
+    objc2::rc::autoreleasepool(|_| -> Option<Vec<u8>> {
+        let path_ns = NSString::from_str(path);
+        let image = NSWorkspace::sharedWorkspace().iconForFile(&path_ns);
+
+        // Choose what you consider "high quality" output.
+        // 256 is a good default; you can bump to 512 if you want.
+        let target: f64 = 256.0;
+
+        let png_data: Retained<NSData> = (|| -> Option<_> {
+            unsafe {
+                // Pick the best representation:
+                // - Prefer the smallest rep that is >= target (avoids upscaling)
+                // - Otherwise pick the largest available rep
+                let mut best_rep = None::<Retained<NSImageRep>>;
+                let mut best_w = 0.0;
+                let mut best_h = 0.0;
+
+                let mut largest_rep = None::<Retained<NSImageRep>>;
+                let mut largest_area = 0.0;
+                let mut largest_w = 0.0;
+                let mut largest_h = 0.0;
+
+                for rep in image.representations().iter() {
+                    let s = rep.size();
+                    let w = s.width;
+                    let h = s.height;
+
+                    // Track largest (fallback)
+                    let area = w * h;
+                    if area > largest_area {
+                        largest_area = area;
+                        largest_rep = Some(rep.retain());
+                        largest_w = w;
+                        largest_h = h;
+                    }
+
+                    // Track best rep for target (no upscale if possible)
+                    if w >= target && h >= target {
+                        let best_area = best_w * best_h;
+                        if best_rep.is_none() || area < best_area {
+                            best_rep = Some(rep.retain());
+                            best_w = w;
+                            best_h = h;
+                        }
+                    }
+                }
+
+                let (rep, out_w, out_h) = if let Some(rep) = best_rep {
+                    (rep, target, target)
+                } else if let Some(rep) = largest_rep {
+                    // If nothing reaches target, use largest and render at its native size
+                    (rep, largest_w, largest_h)
+                } else {
+                    return None;
+                };
+
+                let new_image = NSImage::imageWithSize_flipped_drawingHandler(
+                    NSSize::new(out_w, out_h),
+                    false,
+                    &block2::RcBlock::new(move |rect| {
+                        rep.drawInRect(rect);
+                        true.into()
+                    }),
+                );
+
+                NSBitmapImageRep::imageRepWithData(&*new_image.TIFFRepresentation()?)?
+                    .representationUsingType_properties(
+                        NSBitmapImageFileType::PNG,
+                        &NSDictionary::new(),
+                    )
+            }
+        })()?;
+
+        Some(png_data.to_vec())
+    })
 }
