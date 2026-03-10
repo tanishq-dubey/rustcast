@@ -19,14 +19,14 @@ use crate::app::WINDOW_WIDTH;
 use crate::app::apps::App;
 use crate::app::apps::AppCommand;
 use crate::app::default_settings;
+use crate::app::menubar::menu_builder;
 use crate::app::menubar::menu_icon;
 use crate::app::tile::AppIndex;
 use crate::app::{Message, Page, tile::Tile};
 use crate::calculator::Expr;
-use crate::calculator::is_valid_expr;
-use crate::clipboard::ClipBoardContentType;
 use crate::commands::Function;
 use crate::config::Config;
+use crate::tile::Hotkeys;
 use crate::unit_conversion;
 use crate::utils::is_valid_url;
 use crate::{app::ArrowKey, platform::focus_this_app};
@@ -239,16 +239,32 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
                 Err(_) => return Task::none(),
             };
 
+            if let Some(icon) = tile.tray_icon.as_mut() {
+                icon.set_visible(new_config.clone().show_trayicon)
+                    .unwrap_or(());
+                icon.set_menu(Some(Box::new(menu_builder(
+                    new_config.clone(),
+                    tile.sender.clone().unwrap(),
+                ))));
+            } else {
+                tile.tray_icon = Some(menu_icon(new_config.clone(), tile.sender.clone().unwrap()));
+            }
+
             let mut new_options = get_installed_apps(new_config.theme.show_icons);
             new_options.extend(new_config.shells.iter().map(|x| x.to_app()));
             new_options.extend(new_config.modes.to_apps());
             new_options.extend(App::basic_apps());
             new_options.par_sort_by_key(|x| x.display_name.len());
 
-            tile.tray_icon = if new_config.show_trayicon {
-                Some(menu_icon(new_config.clone(), tile.sender.clone().unwrap()))
-            } else {
-                None
+            tile.hotkeys = Hotkeys {
+                toggle: new_config
+                    .toggle_hotkey
+                    .parse()
+                    .unwrap_or(tile.hotkeys.toggle),
+                clipboard_hotkey: new_config
+                    .clipboard_hotkey
+                    .parse()
+                    .unwrap_or(tile.hotkeys.clipboard_hotkey),
             };
 
             tile.theme = new_config.theme.to_owned().into();
@@ -471,22 +487,23 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
                         return Task::batch([zero_item_resize_task(id), task]);
                     }
                 }
-                _ => {}
-            }
-
-            if tile.query_lc.starts_with(">") && tile.page == Page::Main {
-                let command = tile.query.strip_prefix(">").unwrap_or("");
-                tile.results = vec![App {
-                    ranking: 20,
-                    open_command: AppCommand::Function(Function::RunShellCommand(
-                        command.to_string(),
-                    )),
-                    display_name: format!("Shell Command: {}", command),
-                    icons: None,
-                    search_name: "".to_string(),
-                    desc: "Shell Command".to_string(),
-                }];
-                return single_item_resize_task(id);
+                query => 'a: {
+                    if !query.starts_with(">") || tile.page != Page::Main {
+                        break 'a;
+                    }
+                    let command = tile.query.strip_prefix(">").unwrap_or("");
+                    tile.results = vec![App {
+                        ranking: 20,
+                        open_command: AppCommand::Function(Function::RunShellCommand(
+                            command.to_string(),
+                        )),
+                        display_name: format!("Shell Command: {}", command),
+                        icons: None,
+                        search_name: "".to_string(),
+                        desc: "Shell Command".to_string(),
+                    }];
+                    return single_item_resize_task(id);
+                }
             }
 
             tile.handle_search_query_changed();
@@ -509,6 +526,7 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
                     return task;
                 }
             }
+
             if is_valid_url(&tile.query) {
                 tile.results.push(App {
                     ranking: 0,
@@ -521,31 +539,10 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
             } else if let Some(conversions) = unit_conversion::convert_query(&tile.query) {
                 tile.results = conversions
                     .into_iter()
-                    .map(|conversion| {
-                        let source = format!(
-                            "{} {}",
-                            unit_conversion::format_number(conversion.source_value),
-                            conversion.source_unit.name
-                        );
-                        let target = format!(
-                            "{} {}",
-                            unit_conversion::format_number(conversion.target_value),
-                            conversion.target_unit.name
-                        );
-                        App {
-                            ranking: 0,
-                            open_command: AppCommand::Function(Function::CopyToClipboard(
-                                ClipBoardContentType::Text(target.clone()),
-                            )),
-                            desc: source,
-                            icons: None,
-                            display_name: target,
-                            search_name: String::new(),
-                        }
-                    })
+                    .map(|conversion| conversion.to_app())
                     .collect();
-            } else if is_valid_expr(&tile.query) {
-                let res = Expr::from_str(&tile.query).unwrap();
+                return single_item_resize_task(id);
+            } else if let Some(res) = Expr::from_str(&tile.query).ok() {
                 tile.results.push(App {
                     ranking: 0,
                     open_command: AppCommand::Function(Function::Calculate(res.clone())),
@@ -555,9 +552,7 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
                     search_name: "".to_string(),
                 });
                 return single_item_resize_task(id);
-            } else if tile.query_lc.ends_with("?")
-                || tile.query_lc.split_whitespace().nth(2).is_some()
-            {
+            } else if tile.query.ends_with("?") || tile.query.split_whitespace().nth(2).is_some() {
                 tile.results = vec![App {
                     ranking: 0,
                     open_command: AppCommand::Function(Function::GoogleSearch(tile.query.clone())),

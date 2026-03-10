@@ -63,7 +63,7 @@ impl AppIndex {
             None => return,
         };
 
-        app.ranking += 5;
+        app.ranking += 1;
     }
 
     fn empty() -> AppIndex {
