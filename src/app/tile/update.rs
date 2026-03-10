@@ -489,7 +489,7 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
                 }
                 query => 'a: {
                     if !query.starts_with(">") || tile.page != Page::Main {
-                        break 'a
+                        break 'a;
                     }
                     let command = tile.query.strip_prefix(">").unwrap_or("");
                     tile.results = vec![App {
