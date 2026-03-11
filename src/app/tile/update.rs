@@ -25,6 +25,7 @@ use crate::app::tile::AppIndex;
 use crate::app::{Message, Page, tile::Tile};
 use crate::calculator::Expr;
 use crate::commands::Function;
+use crate::commands::search_for_file;
 use crate::config::Config;
 use crate::unit_conversion;
 use crate::utils::is_valid_url;
@@ -156,7 +157,7 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
                 };
 
                 let quantity = match tile.page {
-                    Page::Main => 66.5,
+                    Page::Main | Page::FileSearch => 66.5,
                     Page::ClipboardHistory => 50.,
                     Page::EmojiSearch => 5.,
                 };
@@ -436,7 +437,9 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
                 };
             }
 
-            if tile.query_lc.is_empty() {
+            if tile.query_lc.is_empty()
+                || (tile.query_lc.chars().count() < 2 && tile.page == Page::FileSearch)
+            {
                 tile.results = Vec::new();
                 return zero_item_resize_task(id);
             };
@@ -505,7 +508,11 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
                 }
             }
 
-            tile.handle_search_query_changed();
+            if tile.page != Page::FileSearch {
+                tile.handle_search_query_changed();
+            } else {
+                tile.results = search_for_file(&tile.query_lc);
+            }
 
             if !tile.results.is_empty() {
                 tile.results.par_sort_by_key(|x| -x.ranking);

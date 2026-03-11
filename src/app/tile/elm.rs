@@ -137,9 +137,8 @@ pub fn view(tile: &Tile, wid: window::Id) -> Element<'_, Message> {
         };
 
         let results_count = match &tile.page {
-            Page::Main => tile.results.len(),
+            Page::Main | Page::EmojiSearch | Page::FileSearch => tile.results.len(),
             Page::ClipboardHistory => tile.clipboard_content.len(),
-            Page::EmojiSearch => tile.results.len(),
         };
 
         let height = if tile.page == Page::ClipboardHistory {

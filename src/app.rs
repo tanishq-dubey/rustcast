@@ -25,6 +25,7 @@ pub const RUSTCAST_DESC_NAME: &str = "Utility";
 #[derive(Debug, Clone, PartialEq)]
 pub enum Page {
     Main,
+    FileSearch,
     ClipboardHistory,
     EmojiSearch,
 }
