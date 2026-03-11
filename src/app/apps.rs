@@ -134,6 +134,14 @@ impl App {
             },
             App {
                 ranking: 0,
+                open_command: AppCommand::Message(Message::SwitchToPage(Page::FileSearch)),
+                desc: RUSTCAST_DESC_NAME.to_string(),
+                icons: icons.clone(),
+                display_name: "Search for a file".to_string(),
+                search_name: "file search".to_string(),
+            },
+            App {
+                ranking: 0,
                 open_command: AppCommand::Message(Message::ReloadConfig),
                 desc: RUSTCAST_DESC_NAME.to_string(),
                 icons: icons.clone(),

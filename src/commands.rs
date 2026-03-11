@@ -3,10 +3,19 @@
 use std::{process::Command, thread};
 
 use arboard::Clipboard;
+use ignore::{DirEntry, WalkBuilder};
 use objc2_app_kit::NSWorkspace;
 use objc2_foundation::NSURL;
 
-use crate::{calculator::Expr, clipboard::ClipBoardContentType, config::Config};
+use crate::{
+    app::{
+        ToApp,
+        apps::{App, AppCommand},
+    },
+    calculator::Expr,
+    clipboard::ClipBoardContentType,
+    config::Config,
+};
 
 /// The different functions that rustcast can perform
 #[derive(Debug, Clone, PartialEq)]
@@ -103,6 +112,57 @@ impl Function {
                 });
             }
             Function::Quit => std::process::exit(0),
+        }
+    }
+}
+
+pub fn search(home: &str, name: &str) -> Vec<App> {
+    let mut builder = WalkBuilder::new(home);
+    builder.follow_links(false);
+    builder.threads(10);
+
+    let name_clone = name.to_string();
+    builder
+        .build()
+        .filter_map(move |x| {
+            if let Ok(ent) = x {
+                let name = ent.file_name().to_string_lossy();
+                if name.contains(&name_clone) && !name.starts_with(".") {
+                    Some(ent.to_app())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .take(400)
+        .collect()
+}
+
+pub fn search_for_file(name: &str) -> Vec<App> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/".into());
+
+    search(&home, name)
+}
+
+impl ToApp for DirEntry {
+    fn to_app(&self) -> App {
+        let path = "~".to_string()
+            + self
+                .path()
+                .to_str()
+                .unwrap_or("")
+                .to_string()
+                .strip_prefix(&std::env::var("HOME").unwrap_or("".to_string()))
+                .unwrap_or("");
+        App {
+            ranking: 0,
+            open_command: AppCommand::Function(Function::OpenApp(path.clone())),
+            desc: path,
+            icons: None,
+            display_name: self.file_name().to_str().unwrap_or("").to_string(),
+            search_name: "".to_string(),
         }
     }
 }
