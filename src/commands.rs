@@ -142,7 +142,7 @@ pub fn search(home: &str, name: &str) -> Vec<App> {
 
 pub fn search_for_file(name: &str) -> Vec<App> {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/".into());
-    
+
     search(&home, name)
 }
 
