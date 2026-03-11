@@ -250,12 +250,23 @@ h1 em {
   background: rgba(255, 255, 255, 0.03);
 }
 
-.stats-row {
+.stats-row{
   display: flex;
-  gap: 2.5rem;
+  flex-wrap: wrap;
   justify-content: center;
-  animation: fadeUp 0.6s 0.4s ease both;
-  margin-bottom: 20px;
+  gap: 1.25rem;
+}
+
+@media (max-width: 600px){
+  .stats-row{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem 1rem;
+  }
+  .stat{
+    justify-content: center;
+    text-align: center;
+  }
 }
 
 .stat {
@@ -933,20 +944,27 @@ footer {
 }
 
 /* 16:9 responsive embed */
-.video-embed {
+.video-embed{
   position: relative;
-  width: 500px;
+  width: min(500px, 100%);
   margin: 2rem auto 0;
   aspect-ratio: 16 / 9;
 
   border-radius: 18px;
   overflow: hidden;
 
-  /* Subtle panel look; uses your existing theme vars if present */
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
   margin-bottom: 40px;
+}
+
+@media (max-width: 600px){
+  .video-embed{
+    width: 100%;
+    margin-top: 1.25rem;
+    border-radius: 14px;
+  }
 }
 
 .video-embed video {
@@ -1088,4 +1106,17 @@ footer {
   border-color: var(--amber);
   transform: translateY(-1px);
   box-shadow: 0 8px 24px rgba(245, 166, 35, 0.15);
+}
+
+@media (max-width: 600px){
+  footer{
+    padding: 1.25rem 1.25rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .footer-links{
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+  }
 }
