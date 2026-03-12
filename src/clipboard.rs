@@ -18,7 +18,7 @@ impl ToApp for ClipBoardContentType {
     /// display name is only the first line
     fn to_app(&self) -> App {
         let mut display_name = match self {
-            ClipBoardContentType::Image(_) => "<img>".to_string(),
+            ClipBoardContentType::Image(_) => "Image".to_string(),
             ClipBoardContentType::Text(a) => a.to_owned(),
         };
 

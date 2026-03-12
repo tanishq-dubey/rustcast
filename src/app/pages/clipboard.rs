@@ -1,6 +1,7 @@
 //! The elements for the clipboard history page
 use iced::widget::{
-    Scrollable, scrollable,
+    Scrollable,
+    image::{Handle, Viewer},
     scrollable::{Direction, Scrollbar},
 };
 
@@ -25,9 +26,33 @@ pub fn clipboard_view(
 ) -> Element<'static, Message> {
     let theme_clone = theme.clone();
     let theme_clone_2 = theme.clone();
+    let viewport_content: Element<'static, Message> =
+        match clipboard_content.get(focussed_id as usize) {
+            Some(content) => match content {
+                ClipBoardContentType::Text(txt) => Text::new(txt.to_owned())
+                    .height(Length::Fill)
+                    .width(Length::Fill)
+                    .align_x(Alignment::Start)
+                    .font(theme.font())
+                    .size(16)
+                    .into(),
+
+                ClipBoardContentType::Image(data) => {
+                    let bytes = data.to_owned_img().into_owned_bytes();
+                    Viewer::new(
+                        Handle::from_rgba(data.width as u32, data.height as u32, bytes.to_vec())
+                            .clone(),
+                    )
+                    .width(500)
+                    .height(500)
+                    .into()
+                }
+            },
+            None => Text::new("").into(),
+        };
     container(Row::from_vec(vec![
         container(
-            scrollable(
+            iced::widget::scrollable(
                 Column::from_iter(clipboard_content.iter().enumerate().map(|(i, content)| {
                     content
                         .to_app()
@@ -41,17 +66,7 @@ pub fn clipboard_view(
         .style(move |_| result_row_container_style(&theme_clone_2, false))
         .into(),
         container(Scrollable::with_direction(
-            Text::new(
-                clipboard_content
-                    .get(focussed_id as usize)
-                    .map(|x| x.to_app().search_name)
-                    .unwrap_or("".to_string()),
-            )
-            .height(Length::Fill)
-            .width(Length::Fill)
-            .align_x(Alignment::Start)
-            .font(theme.font())
-            .size(16),
+            viewport_content,
             Direction::Both {
                 vertical: Scrollbar::new().scroller_width(0.).width(0.),
                 horizontal: Scrollbar::new().scroller_width(0.).width(0.),
