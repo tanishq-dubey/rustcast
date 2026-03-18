@@ -1,6 +1,7 @@
 //! This handles all the different commands that rustcast can perform, such as opening apps,
 //! copying to clipboard, etc.
 use std::{process::Command, thread};
+use log::info;
 
 use arboard::Clipboard;
 use ignore::{DirEntry, WalkBuilder};
@@ -120,6 +121,7 @@ pub fn search(home: &str, name: &str) -> Vec<App> {
     let mut builder = WalkBuilder::new(home);
     builder.follow_links(false);
     builder.threads(10);
+    info!("DEBUG: file search executed");
 
     let name_clone = name.to_string();
     builder
@@ -136,13 +138,12 @@ pub fn search(home: &str, name: &str) -> Vec<App> {
                 None
             }
         })
-        .take(400)
+        .take(100)
         .collect()
 }
-
+ 
 pub fn search_for_file(name: &str) -> Vec<App> {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/".into());
-
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/".into()) + "/Documents";
     search(&home, name)
 }
 

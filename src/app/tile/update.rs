@@ -3,6 +3,7 @@ use std::cmp::min;
 use std::fs;
 use std::io::Cursor;
 use std::thread;
+use std::time::Duration;
 
 use iced::Task;
 use iced::widget::image::Handle;
@@ -413,7 +414,6 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
         }
 
         Message::SearchQueryChanged(input, id) => {
-            let mut task = Task::none();
             tile.focus_id = 0;
 
             if tile.config.haptic_feedback {
@@ -423,6 +423,35 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
             tile.query_lc = input.trim().to_lowercase();
             tile.query = input;
 
+            // Update debounce timer
+            tile.search_debounce = Some(std::time::Instant::now());
+
+            // Return a task that waits for the debounce delay before executing search
+            Task::perform(
+                async move {
+                    tokio::time::sleep(Duration::from_millis(300)).await;
+                    id
+                },
+                Message::DebouncedSearch,
+            )
+        }
+
+        Message::DebouncedSearch(id) => {
+            // Only execute if this is still the most recent debounce timer
+            if let Some(instant) = tile.search_debounce {
+                if instant.elapsed() < Duration::from_millis(300) {
+                    // A newer keystroke has occurred, skip this search
+                    return Task::none();
+                }
+            } else {
+                // Debounce was cleared, skip
+                return Task::none();
+            }
+
+            // Clear the debounce timer
+            tile.search_debounce = None;
+
+            let mut task = Task::none();
             let prev_size = tile.results.len();
 
             if tile.page == Page::ClipboardHistory && tile.query_lc != "main" {

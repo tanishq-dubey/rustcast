@@ -33,7 +33,7 @@ use std::fmt::Debug;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// This is a wrapper around the sender to disable dropping
 #[derive(Clone, Debug)]
@@ -96,7 +96,7 @@ impl AppIndex {
 /// - Query Lowercase (String, but lowercase)
 /// - Previous Query Lowercase (String)
 /// - Results (Vec<[`App`]>) the results of the search
-/// - Options ([`AppIndex`]) the options to search through (is a BTreeMap wrapper)
+/// - Options ([`AppIndex`]) the options to search through (is a HashMap wrapper)
 /// - Emoji Apps ([`AppIndex`]) emojis that are considered as "apps"
 /// - Visible (bool) whether the window is visible or not
 /// - Focused (bool) whether the window is focused or not
@@ -129,6 +129,7 @@ pub struct Tile {
     sender: Option<ExtSender>,
     page: Page,
     pub height: f32,
+    search_debounce: Option<Instant>,
 }
 
 /// A struct to store all the hotkeys

@@ -71,6 +71,7 @@ pub enum Message {
     SwitchToPage(Page),
     ClipboardHistory(ClipBoardContentType),
     ChangeFocus(ArrowKey, u32),
+    DebouncedSearch(Id),
 }
 
 /// The window settings for rustcast
