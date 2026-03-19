@@ -84,8 +84,8 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
         }
 
         Message::EscKeyPressed(id) => {
-            if tile.page == Page::EmojiSearch && !tile.query_lc.is_empty() {
-                return Task::none();
+            if tile.page != Page::Main {
+                return Task::done(Message::SwitchToPage(Page::Main));
             }
 
             if tile.query_lc.is_empty() {

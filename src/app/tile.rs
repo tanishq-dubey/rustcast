@@ -184,9 +184,6 @@ impl Tile {
             keyboard::listen().filter_map(|event| {
                 if let keyboard::Event::KeyPressed { key, modifiers, .. } = event {
                     match key {
-                        keyboard::Key::Named(Named::Escape) => {
-                            return Some(Message::ReturnFocus);
-                        }
                         keyboard::Key::Named(Named::ArrowUp) => {
                             return Some(Message::ChangeFocus(ArrowKey::Up, 1));
                         }

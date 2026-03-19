@@ -161,7 +161,7 @@ pub fn view(tile: &Tile, wid: window::Id) -> Element<'_, Message> {
                 format!("{results_count} results found")
             }
         } else {
-            String::from("♥️ Rustcast")
+            tile.page.to_string()
         };
 
         let contents = container(
