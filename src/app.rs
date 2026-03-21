@@ -25,7 +25,7 @@ pub const DEFAULT_WINDOW_HEIGHT: f32 = 100.;
 pub const FILE_SEARCH_MAX_RESULTS: u32 = 400;
 
 /// Number of results to accumulate before flushing a batch to the UI.
-pub const FILE_SEARCH_BATCH_SIZE: u32 = 50;
+pub const FILE_SEARCH_BATCH_SIZE: u32 = 10;
 
 /// The rustcast descriptor name to be put for all rustcast commands
 pub const RUSTCAST_DESC_NAME: &str = "Utility";

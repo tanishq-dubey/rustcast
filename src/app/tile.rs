@@ -392,8 +392,6 @@ async fn read_mdfind_results(
 ) {
     use crate::app::{FILE_SEARCH_BATCH_SIZE, FILE_SEARCH_MAX_RESULTS};
 
-    assert!(!home_dir.is_empty(), "Home directory must not be empty.");
-
     let mut reader = tokio::io::BufReader::new(stdout);
     let mut batch: Vec<crate::app::apps::App> = Vec::with_capacity(FILE_SEARCH_BATCH_SIZE as usize);
     let mut total_sent: u32 = 0;
@@ -487,6 +485,7 @@ fn handle_file_search() -> impl futures::Stream<Item = Message> {
             // The query is passed as a -name argument to mdfind. mdfind interprets
             // this as a substring match on filenames — not as a glob or shell expression.
             // Passed via args (not shell), so no shell injection risk.
+            // When dirs is empty, omit -onlyin so mdfind searches system-wide.
             let mut args: Vec<String> = vec!["-name".to_string(), query.clone()];
             for dir in &dirs {
                 let expanded = dir.replace("~", &home_dir);
