@@ -1,5 +1,6 @@
 //! This contains the functions to use for rendering the emoji page
 use iced::{Border, Length::Fill, border::Radius, widget::tooltip};
+use log::info;
 
 use crate::{
     app::pages::prelude::*,
@@ -28,10 +29,13 @@ pub fn emoji_page(
 
     let mut id_num = 0;
 
+    info!("emojis found: {}", emojis.len());
     for emoji_row in emoji_vec {
         let mut emoji_row_element = Row::new().spacing(10);
         for emoji in emoji_row {
             let theme_clone = tile_theme.clone();
+
+            // Emoji text
             let element_column = Column::new().push(
                 Text::new(emoji.display_name.clone())
                     .font(tile_theme.font())
@@ -43,6 +47,8 @@ pub fn emoji_page(
             );
             let value = tile_theme.clone();
             let value_two = tile_theme.clone();
+
+            // Emoji icon + Emoji container
             emoji_row_element = emoji_row_element.push(tooltip(
                 container(
                     Button::new(element_column)
