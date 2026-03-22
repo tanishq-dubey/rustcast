@@ -26,7 +26,7 @@ pub fn settings_page(config: Config) -> Element<'static, Message> {
 
     let hotkey_theme = theme.clone();
     let hotkey = settings_item_column([
-        settings_hint_text(theme.clone(), "Set your hotkey"),
+        settings_hint_text(theme.clone(), "Toggle hotkey"),
         text_input("Toggle Hotkey", &config.toggle_hotkey)
             .on_input(|input| Message::SetConfig(SetConfigFields::ToggleHotkey(input.clone())))
             .on_submit(Message::WriteConfig)
@@ -37,7 +37,7 @@ pub fn settings_page(config: Config) -> Element<'static, Message> {
 
     let cb_theme = theme.clone();
     let cb_hotkey = settings_item_column([
-        settings_hint_text(theme.clone(), "Set your hotkey"),
+        settings_hint_text(theme.clone(), "Clipboard hotkey"),
         text_input("Clipboard Hotkey", &config.clipboard_hotkey)
             .on_input(|input| Message::SetConfig(SetConfigFields::ClipboardHotkey(input.clone())))
             .on_submit(Message::WriteConfig)
@@ -223,7 +223,7 @@ pub fn settings_page(config: Config) -> Element<'static, Message> {
     let theme_clone_2 = theme.clone();
     let theme_clone_3 = theme.clone();
     let bg_clr = Column::from_iter([
-        settings_hint_text(theme.clone(), "Set text colour"),
+        settings_hint_text(theme.clone(), "Set background colour"),
         Column::from_iter([
             settings_hint_text(theme.clone(), "Set R value"),
             Slider::new(
