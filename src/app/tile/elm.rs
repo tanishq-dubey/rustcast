@@ -54,6 +54,12 @@ pub fn new(hotkey: HotKey, config: &Config) -> (Tile, Task<Message>) {
     info!("Loaded basic apps / default apps");
     options.par_sort_by_key(|x| x.display_name.len());
     let options = AppIndex::from_apps(options);
+    let mut recent_actions =
+        crate::app::tile::recent_actions::RecentActions::load(config.recent_actions_limit);
+
+    if recent_actions.prune_by(|key| options.contains_key(key)) {
+        recent_actions.persist_async();
+    }
 
     let hotkeys = Hotkeys {
         toggle: hotkey,
@@ -79,6 +85,7 @@ pub fn new(hotkey: HotKey, config: &Config) -> (Tile, Task<Message>) {
             focused: false,
             config: config.clone(),
             theme: config.theme.to_owned().clone().into(),
+            recent_actions,
             clipboard_content: vec![],
             tray_icon: None,
             sender: None,
@@ -133,8 +140,12 @@ pub fn view(tile: &Tile, wid: window::Id) -> Element<'_, Message> {
             Page::Settings => settings_page(tile.config.clone()),
             Page::FileSearch | Page::Main => container(Column::from_iter(
                 tile.results.iter().enumerate().map(|(i, app)| {
-                    app.clone()
-                        .render(tile.config.theme.clone(), i as u32, tile.focus_id)
+                    app.clone().render(
+                        tile.config.theme.clone(),
+                        i as u32,
+                        tile.focus_id,
+                        Some(Message::OpenResult(i as u32)),
+                    )
                 }),
             ))
             .into(),
@@ -156,7 +167,11 @@ pub fn view(tile: &Tile, wid: window::Id) -> Element<'_, Message> {
             .height(height as u32);
 
         let text = if tile.query_lc.is_empty() {
-            tile.page.to_string()
+            if tile.page == Page::Main {
+                "Recent actions".to_string()
+            } else {
+                tile.page.to_string()
+            }
         } else {
             match results_count {
                 1 => "1 result found".to_string(),
