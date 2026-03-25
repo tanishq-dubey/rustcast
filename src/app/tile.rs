@@ -4,8 +4,8 @@ pub mod update;
 
 use crate::app::apps::App;
 use crate::app::{
-    ArrowKey, Message, Move, Page, FILE_SEARCH_BATCH_SIZE, FILE_SEARCH_ICON_BATCH_SIZE,
-    FILE_SEARCH_MAX_ICONS, FILE_SEARCH_MAX_RESULTS,
+    ArrowKey, FILE_SEARCH_BATCH_SIZE, FILE_SEARCH_ICON_BATCH_SIZE, FILE_SEARCH_MAX_ICONS,
+    FILE_SEARCH_MAX_RESULTS, Message, Move, Page,
 };
 use crate::clipboard::ClipBoardContentType;
 use crate::config::Config;
@@ -42,8 +42,8 @@ use tray_icon::TrayIcon;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 /// This is a wrapper around the sender to disable dropping
@@ -462,9 +462,8 @@ fn configure_metadata_query(
     // parses the format string and substitutes %@ with the argument array values.
     // The format string is a compile-time constant and args contains a single valid
     // NSString, so the call is well-formed.
-    let predicate = unsafe {
-        NSPredicate::predicateWithFormat_argumentArray(&format_str, Some(&args))
-    };
+    let predicate =
+        unsafe { NSPredicate::predicateWithFormat_argumentArray(&format_str, Some(&args)) };
     query.setPredicate(Some(&predicate));
 
     let scope_strings: Vec<objc2::rc::Retained<NSString>> = dirs
@@ -499,8 +498,7 @@ fn drain_metadata_results(
     let limit = count.min(FILE_SEARCH_MAX_RESULTS as usize);
     let attr_key = unsafe { NSMetadataItemPathKey };
 
-    let mut batch: Vec<crate::app::apps::App> =
-        Vec::with_capacity(FILE_SEARCH_BATCH_SIZE as usize);
+    let mut batch: Vec<crate::app::apps::App> = Vec::with_capacity(FILE_SEARCH_BATCH_SIZE as usize);
     let mut paths: Vec<String> = Vec::with_capacity(limit);
     let mut idx: usize = 0;
 
@@ -549,7 +547,10 @@ fn load_file_search_icons(
 ) {
     let limit = paths.len().min(FILE_SEARCH_MAX_ICONS);
 
-    assert!(FILE_SEARCH_ICON_BATCH_SIZE > 0, "Batch size must be positive.");
+    assert!(
+        FILE_SEARCH_ICON_BATCH_SIZE > 0,
+        "Batch size must be positive."
+    );
 
     let mut icon_batch: Vec<(usize, iced::widget::image::Handle)> =
         Vec::with_capacity(FILE_SEARCH_ICON_BATCH_SIZE);
@@ -582,7 +583,9 @@ fn load_file_search_icons(
 
         if icon_batch.len() >= FILE_SEARCH_ICON_BATCH_SIZE || idx >= limit {
             if !icon_batch.is_empty() {
-                if let Err(e) = msg_tx.try_send(QueryThreadMsg::Icons(std::mem::take(&mut icon_batch))) {
+                if let Err(e) =
+                    msg_tx.try_send(QueryThreadMsg::Icons(std::mem::take(&mut icon_batch)))
+                {
                     warn!("Failed to send icon batch: {e}");
                 }
             }
@@ -643,9 +646,11 @@ fn metadata_query_thread_setup() -> (
 
     let results_ready = Arc::new(AtomicBool::new(false));
     let flag = results_ready.clone();
-    let block = RcBlock::new(move |_: core::ptr::NonNull<objc2_foundation::NSNotification>| {
-        flag.store(true, Ordering::Release);
-    });
+    let block = RcBlock::new(
+        move |_: core::ptr::NonNull<objc2_foundation::NSNotification>| {
+            flag.store(true, Ordering::Release);
+        },
+    );
 
     let center = NSNotificationCenter::defaultCenter();
     // SAFETY: addObserverForName registers a notification block with the default center.
@@ -659,7 +664,10 @@ fn metadata_query_thread_setup() -> (
         )
     };
 
-    assert!(!results_ready.load(Ordering::Acquire), "Flag must start false.");
+    assert!(
+        !results_ready.load(Ordering::Acquire),
+        "Flag must start false."
+    );
     assert!(query.resultCount() == 0, "Query must start empty.");
 
     (query, results_ready, observer)
