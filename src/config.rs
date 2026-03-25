@@ -42,7 +42,7 @@ impl Default for Config {
             buffer_rules: Buffer::default(),
             theme: Theme::default(),
             placeholder: String::from("Time to be productive!"),
-            search_url: "https://google.com/search?q=%s".to_string(),
+            search_url: "https://duckduckgo.com/search?q=%s".to_string(),
             haptic_feedback: false,
             show_trayicon: true,
             search_dirs: vec!["~".to_string()],
@@ -74,7 +74,7 @@ impl Default for Theme {
             background_color: (0.0, 0.0, 0.0),
             blur: false,
             show_icons: true,
-            show_scroll_bar: true,
+            show_scroll_bar: false,
             font: None,
         }
     }

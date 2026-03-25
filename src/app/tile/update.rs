@@ -15,6 +15,7 @@ use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
 
+use crate::app::Editable;
 use crate::app::SetConfigBufferFields;
 use crate::app::SetConfigFields;
 use crate::app::SetConfigThemeFields;
@@ -72,7 +73,7 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
             } else {
                 info!("Switching to default mode");
                 tile.current_mode = "default".to_string();
-                window::latest().map(|x| Message::HideWindow(x.unwrap()))
+                Task::none()
             }
         }
 
@@ -94,13 +95,17 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
         }
 
         Message::EscKeyPressed(id) => {
+            if !tile.query_lc.is_empty() {
+                return Task::batch([
+                    Task::done(Message::ClearSearchQuery),
+                    Task::done(Message::ClearSearchResults),
+                ]);
+            }
+
             match tile.page {
                 Page::Main => {}
                 Page::Settings => {
-                    return Task::batch([
-                        Task::done(Message::WriteConfig),
-                        Task::done(Message::SwitchToPage(Page::Main)),
-                    ]);
+                    return Task::done(Message::WriteConfig(true));
                 }
                 _ => {
                     return Task::done(Message::SwitchToPage(Page::Main));
@@ -178,8 +183,7 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
                 };
 
                 let quantity = match tile.page {
-                    Page::Main | Page::FileSearch => 66.5,
-                    Page::ClipboardHistory => 50.,
+                    Page::Main | Page::FileSearch | Page::ClipboardHistory => 66.5,
                     Page::EmojiSearch => 5.,
                     Page::Settings => 0.,
                 };
@@ -226,6 +230,42 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
 
         Message::OpenFocused => Task::done(Message::OpenResult(tile.focus_id)),
         Message::OpenResult(id) => open_result(tile, id as usize),
+        Message::OpenFocused => {
+            info!("Open Focussed called");
+            let results = if tile.page == Page::ClipboardHistory {
+                tile.clipboard_content
+                    .iter()
+                    .map(|x| x.to_app().to_owned())
+                    .collect()
+            } else {
+                tile.results.clone()
+            };
+            match results.get(tile.focus_id as usize) {
+                Some(App {
+                    search_name: name,
+                    open_command: AppCommand::Function(func),
+                    ..
+                }) => {
+                    info!("Updating ranking for: {name}");
+                    tile.options.update_ranking(name);
+                    Task::done(Message::RunFunction(func.to_owned()))
+                }
+                Some(App {
+                    search_name: name,
+                    open_command: AppCommand::Message(msg),
+                    ..
+                }) => {
+                    info!("Updating ranking for: {name}");
+                    tile.options.update_ranking(name);
+                    Task::done(msg.to_owned())
+                }
+                Some(App {
+                    open_command: AppCommand::Display,
+                    ..
+                }) => Task::done(Message::ReturnFocus),
+                None => Task::none(),
+            }
+        }
 
         Message::ReloadConfig => {
             info!("Reloading config");
@@ -257,15 +297,8 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
                     .ok();
             }
 
-            let mut new_options = get_installed_apps(new_config.theme.show_icons);
-            new_options.extend(new_config.shells.iter().map(|x| x.to_app()));
-            new_options.extend(new_config.modes.to_apps());
-            new_options.extend(App::basic_apps());
-            new_options.par_sort_by_key(|x| x.display_name.len());
-
             tile.theme = new_config.theme.to_owned().into();
             tile.config = new_config;
-            tile.options = AppIndex::from_apps(new_options);
             Task::none()
         }
 
@@ -367,6 +400,9 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
         }
 
         Message::HideWindow(a) => {
+            if tile.page == Page::Settings {
+                return Task::none();
+            }
             info!("Hiding RustCast window");
             tile.visible = false;
             tile.focused = false;
@@ -403,6 +439,17 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
             ])
         }
 
+        Message::UpdateApps => {
+            let mut new_options = get_installed_apps(tile.config.theme.show_icons);
+            new_options.extend(tile.config.shells.iter().map(|x| x.to_app()));
+            new_options.extend(tile.config.modes.to_apps());
+            new_options.extend(App::basic_apps());
+            new_options.par_sort_by_key(|x| x.display_name.len());
+            tile.options = AppIndex::from_apps(new_options);
+
+            Task::none()
+        }
+
         Message::ClearSearchResults => {
             tile.results = Vec::new();
             Task::none()
@@ -416,26 +463,50 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
             }
         }
 
-        Message::ClipboardHistory(content) => {
-            if !tile.clipboard_content.contains(&content) {
-                tile.clipboard_content.insert(0, content);
-                return Task::none();
-            }
-
-            let new_content_vec = tile
-                .clipboard_content
-                .par_iter()
-                .filter_map(|x| {
-                    if *x == content {
-                        None
-                    } else {
-                        Some(x.to_owned())
+        Message::EditClipboardHistory(action) => {
+            match action {
+                Editable::Create(content) => {
+                    if !tile.clipboard_content.contains(&content) {
+                        tile.clipboard_content.insert(0, content);
+                        return Task::none();
                     }
-                })
-                .collect();
 
-            tile.clipboard_content = new_content_vec;
-            tile.clipboard_content.insert(0, content);
+                    let new_content_vec = tile
+                        .clipboard_content
+                        .par_iter()
+                        .filter_map(|x| {
+                            if *x == content {
+                                None
+                            } else {
+                                Some(x.to_owned())
+                            }
+                        })
+                        .collect();
+
+                    tile.clipboard_content = new_content_vec;
+                    tile.clipboard_content.insert(0, content);
+                }
+                Editable::Delete(content) => {
+                    tile.clipboard_content = tile
+                        .clipboard_content
+                        .iter()
+                        .filter_map(|x| {
+                            if *x == content {
+                                None
+                            } else {
+                                Some(x.to_owned())
+                            }
+                        })
+                        .collect();
+                }
+                Editable::Update { old, new } => {
+                    tile.clipboard_content = tile
+                        .clipboard_content
+                        .iter()
+                        .map(|x| if x == &old { new.clone() } else { x.to_owned() })
+                        .collect();
+                }
+            }
             Task::none()
         }
 
@@ -499,14 +570,69 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
             }
         }
 
+        Message::OpenFileDialogue(mode_name) => rfd::FileDialog::new()
+            .add_filter("shell", &["sh", "bash", "zsh"])
+            .set_directory(
+                std::env::var("HOME").unwrap_or("".to_string()) + "/.config/rustcast/config.toml",
+            )
+            .pick_file()
+            .and_then(|path| {
+                path.to_str().map(|path_str| {
+                    Task::batch([
+                        Task::done(Message::SetConfig(SetConfigFields::Modes(
+                            Editable::Create((mode_name, path_str.to_string())),
+                        ))),
+                        Task::done(Message::WriteConfig(false)),
+                    ])
+                })
+            })
+            .unwrap_or(Task::none()),
+
         Message::SetConfig(config) => {
             let mut final_config = tile.config.clone();
             match config {
                 SetConfigFields::ToggleHotkey(hk) => final_config.toggle_hotkey = hk,
                 SetConfigFields::ClipboardHotkey(hk) => final_config.clipboard_hotkey = hk,
-                //                SetConfigFields::Modes(modes) => final_config.modes = modes,
-                //                SetConfigFields::Aliases(aliases) => final_config.aliases = aliases,
-                //                SetConfigFields::SearchDirs(dirs) => final_config.search_dirs = dirs,
+                SetConfigFields::Modes(Editable::Create((key, value))) => {
+                    final_config.modes.insert(key, value);
+                }
+                SetConfigFields::Modes(Editable::Delete((key, _))) => {
+                    final_config.modes.remove(&key);
+                }
+                SetConfigFields::Modes(Editable::Update { old, new }) => {
+                    final_config.modes.remove(&old.0);
+                    final_config.modes.insert(new.0, new.1);
+                }
+                SetConfigFields::Aliases(Editable::Create((key, value))) => {
+                    final_config.aliases.entry(key).or_insert(value);
+                }
+                SetConfigFields::Aliases(Editable::Delete((key, _))) => {
+                    final_config.aliases.remove(&key);
+                }
+                SetConfigFields::Aliases(Editable::Update { old, new }) => {
+                    final_config.aliases.remove(&old.0);
+                    final_config.aliases.insert(new.0, new.1);
+                }
+                SetConfigFields::SearchDirs(Editable::Create(dir)) => {
+                    final_config.search_dirs = dir
+                }
+                SetConfigFields::SearchDirs(Editable::Delete(dirs)) => {
+                    final_config.search_dirs = final_config
+                        .search_dirs
+                        .iter()
+                        .filter_map(|dir| {
+                            if !dirs.contains(dir) {
+                                Some(dir.to_owned())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                }
+                SetConfigFields::SearchDirs(Editable::Update { old, new }) => {
+                    let _ = old;
+                    let _ = new;
+                }
                 SetConfigFields::SearchUrl(url) => final_config.search_url = url,
                 SetConfigFields::PlaceHolder(placeholder) => final_config.placeholder = placeholder,
                 SetConfigFields::DebounceDelay(delay) => final_config.debounce_delay = delay,
@@ -523,6 +649,9 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
                 SetConfigFields::SetThemeFields(SetConfigThemeFields::ShowIcons(icns)) => {
                     final_config.theme.show_icons = icns
                 }
+                SetConfigFields::SetThemeFields(SetConfigThemeFields::ShowScrollBar(show)) => {
+                    final_config.theme.show_scroll_bar = show
+                }
                 SetConfigFields::SetThemeFields(SetConfigThemeFields::BackgroundColor(r, g, b)) => {
                     final_config.theme.background_color = (r, g, b)
                 }
@@ -535,9 +664,7 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
                 SetConfigFields::ToDefault => {
                     final_config = Config::default();
                     final_config.shells = tile.config.shells.clone();
-                    final_config.aliases = tile.config.aliases.clone();
                     final_config.search_dirs = tile.config.search_dirs.clone();
-                    final_config.modes = tile.config.modes.clone();
                 }
             };
 
@@ -545,9 +672,12 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
             Task::none()
         }
 
-        Message::WriteConfig => {
+        Message::WriteConfig(page_switch) => {
             let config_file_path =
                 std::env::var("HOME").unwrap_or("".to_string()) + "/.config/rustcast/config.toml";
+
+            tile.config.aliases.remove("");
+            tile.config.modes.remove("");
 
             let config_string = match toml::to_string_pretty(&tile.config) {
                 Ok(a) => a,
@@ -565,6 +695,18 @@ pub fn handle_update(tile: &mut Tile, message: Message) -> Task<Message> {
                 })
                 .ok();
 
+            Task::batch([
+                Task::done(Message::ReloadConfig),
+                if page_switch {
+                    Task::done(Message::SwitchToPage(Page::Main))
+                } else {
+                    Task::none()
+                },
+            ])
+        }
+
+        Message::ClearClipboardHistory => {
+            tile.clipboard_content.clear();
             Task::none()
         }
 

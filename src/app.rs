@@ -69,10 +69,17 @@ pub enum Move {
     Forwards(String),
 }
 
+#[derive(Debug, Clone)]
+pub enum Editable<T> {
+    Create(T),
+    Delete(T),
+    Update { old: T, new: T },
+}
+
 /// The message type that iced uses for actions that can do something
 #[derive(Debug, Clone)]
 pub enum Message {
-    WriteConfig,
+    WriteConfig(bool),
     UpdateAvailable,
     ResizeWindow(Id, f32),
     OpenWindow,
@@ -85,6 +92,7 @@ pub enum Message {
     RunFunction(Function),
     OpenFocused,
     SetConfig(SetConfigFields),
+    OpenFileDialogue(String),
     ReturnFocus,
     EscKeyPressed(Id),
     ClearSearchResults,
@@ -93,9 +101,11 @@ pub enum Message {
     HideTrayIcon,
     SwitchMode(String),
     ReloadConfig,
+    UpdateApps,
     SetSender(ExtSender),
     SwitchToPage(Page),
-    ClipboardHistory(ClipBoardContentType),
+    EditClipboardHistory(Editable<ClipBoardContentType>),
+    ClearClipboardHistory,
     ChangeFocus(ArrowKey, u32),
     FileSearchResult(Vec<App>),
     FileSearchClear,
@@ -104,6 +114,7 @@ pub enum Message {
 }
 
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub enum SetConfigFields {
     ToDefault,
     ToggleHotkey(String),
@@ -112,9 +123,9 @@ pub enum SetConfigFields {
     SearchUrl(String),
     HapticFeedback(bool),
     ShowMenubarIcon(bool),
-    //    Modes(HashMap<String, String>),
-    //    Aliases(HashMap<String, String>),
-    //    SearchDirs(Vec<String>),
+    Modes(Editable<(String, String)>),
+    Aliases(Editable<(String, String)>),
+    SearchDirs(Editable<Vec<String>>),
     DebounceDelay(u64),
     SetThemeFields(SetConfigThemeFields),
     SetBufferFields(SetConfigBufferFields),
@@ -122,6 +133,7 @@ pub enum SetConfigFields {
 
 #[derive(Debug, Clone)]
 pub enum SetConfigThemeFields {
+    ShowScrollBar(bool),
     TextColor(f32, f32, f32),
     BackgroundColor(f32, f32, f32),
     ShowIcons(bool),
